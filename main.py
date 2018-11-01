@@ -174,6 +174,7 @@ def parse_detail(url, item, headers):
         trs = soup.find('table', id='product-attribute-table').find_all('tr')[2:]   #新命名的数据名
         item['Part Type'] = trs[0].find_all('td')[0].text.strip()
         #print("this is  ok2",item['Part Type'])
+        temp_package_case = 0
         count = 0
         for tr in trs[1:]:
             categories = tr.find('th').text.strip()
@@ -191,6 +192,9 @@ def parse_detail(url, item, headers):
             if categories == 'Mounting Type':
                 item['Mounting Type'] = value
             if categories == 'Supplier Device Package':
+                item['Supplier Device Package'] = value
+                temp_package_case = 1
+            if temp_package_case == 0 and categories == 'Size / Dimension':
                 item['Supplier Device Package'] = value
             if categories == 'Series':
                 count = count + 1
