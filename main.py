@@ -219,6 +219,9 @@ def parse_detail(url, item, headers):
             if categories == 'Voltage Rating':
                 count = count + 1
                 item[u'重要参数' + str(count)] = value
+            if categories == 'Voltage - Rated':
+                count = count + 1
+                item[u'重要参数' + str(count)] = value
             if categories == 'Features':
                 count = count + 1
                 item[u'重要参数' + str(count)] = value
