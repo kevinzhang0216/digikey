@@ -43,12 +43,20 @@ def get_item(item):
     return item
 
 
-def parse(url, keyword):
+def parse(url, keyword, work_state):
     ua = UserAgent()
     pre_url = 'https://www.digikey.com'
-    headers = {'User-Agent': ua.get_user_agent()}  # 得到随机User-Agent头
+
+
+    headers = {'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+     'accept-encoding': 'gzip, deflate, br', 'accept-language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
+     'cache-control': 'max-age=0',
+     'upgrade-insecure-requests': '1',
+     'user-agent': ua.get_user_agent()}  # 得到随机User-Agent头
     try:
-        body = s.get(url, headers=headers).content
+        #body = s.get(url, headers=headers).content
+        body = s.get(url, headers=headers).text
+        #print(body)
         soup = BeautifulSoup(body, 'lxml')
         item = {}
         item = get_item(item)
@@ -82,11 +90,12 @@ def parse(url, keyword):
                 if current_keyword == keyword:
                     temp_fit_flag = True
                 if current_keyword == keyword and quantity_available != 0:  # 如果有货且名称正确  则为正常
-                    print("正常型", url) #test1 待修改
+                    if(work_state != 'link_state'):
+                        print("正常型", url) #test1 待修改
                     item['是否检查'] = 'FALSE'
                     item['备注'] = ' '
                     item['是否缺货'] = ' '
-                    return parse_detail(new_url, item, headers)					
+                    return parse_detail(new_url, item, headers, work_state)					
             #    if quantity_available != 0 and has_numbers(unit_price_USD)\
             #            and minimum_quantity == 1 and current_keyword == keyword:  # 当前判定条件
             #        print("正常型", url)
@@ -105,13 +114,15 @@ def parse(url, keyword):
             #        temp_minimum_quantity = minimum_quantity
             #        temp_unit_price_USD = unit_price_USD
             if (short_supply_flag == False and temp_fit_flag == True):  # 名称正确 但是缺货
-                print("缺货", url)
+                if(work_state != 'link_state'):
+                    print("缺货", url)
                 item[u'是否缺货'] = '缺货'
                 item['是否检查'] = 'FALSE'
                 item['备注'] = ' '
-                return parse_detail(new_url, item, headers)
+                return parse_detail(new_url, item, headers, work_state)
             if temp_fit_flag == False:    #名称不正确
-                print("错误类型Error器件名不完整:", url)
+                if(work_state != 'link_state'):
+                    print("错误类型Error器件名不完整:", url)
                 item[u'备注'] = 'ERROR器件名不完整'
                 item = get_item(item)
                 return item
@@ -121,15 +132,18 @@ def parse(url, keyword):
             try:
                 no_result = soup.find('div', id='noResults').find('p').text
                 if len(no_result) > 10:  # 错误类型
-                    print("错误类型Error无该器件:", url)
+                    if(work_state != 'link_state'): 
+                        print("错误类型Error无该器件:", url)
                     item[u'备注'] = 'ERROR无该器件'
                     item = get_item(item)
                     return item
             except Exception:
-                    print("正常型:", url)
-                    return parse_detail(url, item, headers)
+                    if(work_state != 'link_state'):
+                        print("正常型:", url)
+                    return parse_detail(url, item, headers, work_state)
     except Exception:
-        print("解析:", url, "失败")
+        if(work_state != 'link_state'):
+            print("解析:", url, "失败")
         item = {}
         item = get_item(item)
         item['Manufacturer Part Number'] = keyword		
@@ -151,10 +165,10 @@ def parse_unit(unit):
     return unit.replace('µ', 'u')
 
 
-def parse_detail(url, item, headers):
+def parse_detail(url, item, headers, work_state):
     try:
         item[u'手册链接'] = url
-        content = s.get(url, headers=headers).content
+        content = s.get(url, headers=headers).text
         soup = BeautifulSoup(content, 'lxml')
         #product_details = soup.find('table', id='product-details').find_all('tr')
         product_overview = soup.find('table', id='product-overview').find_all('tr')
@@ -378,8 +392,9 @@ def parse_detail(url, item, headers):
                 item['重要参数' + str(i)] = '-'
         return item
     except Exception:
-        print("解析详情页失败!", url)
-        print("需手动添加:", url)
+        if(work_state != 'link_state'):
+            print("解析详情页失败!", url)
+            print("需手动添加:", url)
         item[u'备注'] = '需手动添加'
         item = get_item(item)
         return item
@@ -395,21 +410,27 @@ if __name__ == '__main__':
                'Supplier Device Package', '重要参数1', '重要参数2', '重要参数3', '重要参数4', '重要参数5', '重要参数6',
                '重要参数7', '重要参数8', '重要参数9', '重要参数10', '手册链接', '是否检查', '备注', '是否缺货', 'Unit Price']
     print("==========================================================================")
-    print("=====================Virtual test begins==================================")
-    print("============= ignore the following warnings ==============================")
+    print("============================Link begins===================================")
+    work_state = 'link_state'
     test = "TPS2042BDR"
-    parse(pre_url+test, test)
-    print("If the following information likes above,please contact the administrator.")
-    print("=====================Virtual test ends====================================")
+    item = parse(pre_url+test, test, work_state)
+    cnt = 1
+    while (item['Manufacturer'] != 'Texas Instruments'):
+        print("尝试连接次数:",cnt)
+        item = parse(pre_url+test, test, work_state)
+        cnt = cnt + 1
+    print("============================Link ends=====================================")
     print("==========================================================================")
     print()
     print()
     print()
     print("=====================Real test begins=====================================")
+    work_state = 'work'
     for part_number in part_numbers:
         part_number = str(part_number)
         url = pre_url+part_number
-        item = parse(url=url, keyword=part_number)
+        #time.sleep(1)
+        item = parse(url,part_number,work_state)
         if item is not None:
             items.append(item)
     print("=====================Real test ends=======================================")
